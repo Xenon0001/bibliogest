@@ -1,13 +1,14 @@
 """
     Implementa la conexión a SQLite, inicialización de tablas, migraciones y operaciones CRUD genéricas.
-    Utiliza el patrón Repository para desacoplar la lógica de acceso a datos.
+    Utiliza el patrón de funciones para el acceso a datos.
 """
 import sqlite3
-import os
 import hashlib
 import datetime
+# Importamos la ruta dinámica que resuelve PyInstaller o entorno de desarrollo
+from utils.path_utils import DATABASE_PATH 
 
-DB_FILE = "biblioteca.db"
+# La variable DB_FILE ya no es necesaria, usamos DATABASE_PATH
 
 def obtener_hash(contrasena):
     """Genera el hash MD5 de una contraseña."""
@@ -18,7 +19,8 @@ def inicializar_db():
     conn = None
 
     try:
-        conn = sqlite3.connect(DB_FILE)
+        # Usa la ruta dinámica para la conexión
+        conn = sqlite3.connect(DATABASE_PATH) 
         cursor = conn.cursor()
 
         cursor.execute("PRAGMA foreign_keys = ON;")
@@ -72,7 +74,8 @@ def verificar_existencia_bibliotecarios():
     """Verifica si existe al menos un registro en la tabla 'bibliotecarios'."""
     conn = None
     try:
-        conn = sqlite3.connect(DB_FILE)
+        # Usa la ruta dinámica para la conexión
+        conn = sqlite3.connect(DATABASE_PATH)
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) FROM bibliotecarios")
         conteo = cursor.fetchone()[0]
@@ -91,7 +94,8 @@ def registrar_bibliotecario(nombre, email, contrasena):
     """Registra un nuevo bibliotecario y devuelve True si tiene éxito."""
     conn = None
     try:
-        conn = sqlite3.connect(DB_FILE)
+        # Usa la ruta dinámica para la conexión
+        conn = sqlite3.connect(DATABASE_PATH)
         cursor = conn.cursor()
         password_hash = obtener_hash(contrasena)
         
@@ -114,7 +118,8 @@ def autenticar_bibliotecario(email, contrasena):
     """Autentica un bibliotecario y devuelve su nombre si tiene éxito."""
     conn = None
     try:
-        conn = sqlite3.connect(DB_FILE)
+        # Usa la ruta dinámica para la conexión
+        conn = sqlite3.connect(DATABASE_PATH)
         cursor = conn.cursor()
         password_hash = obtener_hash(contrasena)
 
@@ -144,7 +149,8 @@ def obtener_todos_los_libros():
     """Obtiene todos los libros con el estado de disponibilidad."""
     conn = None
     try:
-        conn = sqlite3.connect(DB_FILE)
+        # Usa la ruta dinámica para la conexión
+        conn = sqlite3.connect(DATABASE_PATH)
         cursor = conn.cursor()
         cursor.execute("SELECT isbn, titulo, autor, categoria, disponible, id FROM libros")
         return cursor.fetchall()
@@ -159,7 +165,8 @@ def obtener_libro_por_isbn(isbn):
     """Obtiene un libro por su ISBN."""
     conn = None
     try:
-        conn = sqlite3.connect(DB_FILE)
+        # Usa la ruta dinámica para la conexión
+        conn = sqlite3.connect(DATABASE_PATH)
         cursor = conn.cursor()
         cursor.execute("SELECT id, isbn, titulo, disponible FROM libros WHERE isbn = ?", (isbn,))
         return cursor.fetchone()
@@ -174,7 +181,8 @@ def obtener_libros_prestados_count():
     """Obtiene el número de libros actualmente prestados (disponible = 0)."""
     conn = None
     try:
-        conn = sqlite3.connect(DB_FILE)
+        # Usa la ruta dinámica para la conexión
+        conn = sqlite3.connect(DATABASE_PATH)
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) FROM libros WHERE disponible = 0")
         return cursor.fetchone()[0]
@@ -189,7 +197,8 @@ def insertar_libro(titulo, autor, isbn, categoria):
     """Inserta un nuevo libro en la base de datos."""
     conn = None
     try:
-        conn = sqlite3.connect(DB_FILE)
+        # Usa la ruta dinámica para la conexión
+        conn = sqlite3.connect(DATABASE_PATH)
         cursor = conn.cursor()
         cursor.execute(
             "INSERT INTO libros (titulo, autor, isbn, categoria) VALUES (?, ?, ?, ?)",
@@ -210,7 +219,8 @@ def actualizar_libro(libro_id, titulo, autor, isbn, categoria):
     """Actualiza la información de un libro existente."""
     conn = None
     try:
-        conn = sqlite3.connect(DB_FILE)
+        # Usa la ruta dinámica para la conexión
+        conn = sqlite3.connect(DATABASE_PATH)
         cursor = conn.cursor()
         cursor.execute(
             "UPDATE libros SET titulo = ?, autor = ?, isbn = ?, categoria = ? WHERE id = ?",
@@ -228,18 +238,20 @@ def actualizar_libro(libro_id, titulo, autor, isbn, categoria):
             conn.close()
 
 def eliminar_libro(libro_id):
-    """Elimina un libro de la base de datos. Solo si no tiene prestamos activos."""
+    """Elimina un libro de la base de datos. Solo si no está prestado activamente."""
     conn = None
     try:
-        conn = sqlite3.connect(DB_FILE)
+        # Usa la ruta dinámica para la conexión
+        conn = sqlite3.connect(DATABASE_PATH)
         cursor = conn.cursor()
         
         # Verificar si el libro está prestado activamente
         cursor.execute("SELECT disponible FROM libros WHERE id = ?", (libro_id,))
         is_available = cursor.fetchone()
         
+        # Si no existe o está prestado (disponible == 0), no se elimina
         if is_available is None or is_available[0] == 0:
-            return False # No existe o está prestado
+            return False 
 
         cursor.execute("DELETE FROM libros WHERE id = ?", (libro_id,))
         conn.commit()
@@ -259,7 +271,8 @@ def obtener_todos_los_usuarios():
     """Obtiene todos los usuarios y el conteo de libros prestados activamente por cada uno."""
     conn = None
     try:
-        conn = sqlite3.connect(DB_FILE)
+        # Usa la ruta dinámica para la conexión
+        conn = sqlite3.connect(DATABASE_PATH)
         cursor = conn.cursor()
         
         query = """
@@ -288,7 +301,8 @@ def obtener_usuario_por_dni(dni):
     """Obtiene un usuario por su DNI. Retorna (id, nombre, dni, telefono) o None."""
     conn = None
     try:
-        conn = sqlite3.connect(DB_FILE)
+        # Usa la ruta dinámica para la conexión
+        conn = sqlite3.connect(DATABASE_PATH)
         cursor = conn.cursor()
         cursor.execute("SELECT id, nombre, dni, telefono FROM usuarios WHERE dni = ?", (dni,))
         return cursor.fetchone()
@@ -303,7 +317,8 @@ def obtener_usuario_por_id(user_id):
     """Obtiene un usuario por su ID. Retorna (id, nombre, dni, telefono) o None."""
     conn = None
     try:
-        conn = sqlite3.connect(DB_FILE)
+        # Usa la ruta dinámica para la conexión
+        conn = sqlite3.connect(DATABASE_PATH)
         cursor = conn.cursor()
         cursor.execute("SELECT id, nombre, dni, telefono FROM usuarios WHERE id = ?", (user_id,))
         return cursor.fetchone()
@@ -318,7 +333,8 @@ def insertar_usuario(nombre, dni, telefono):
     """Inserta un nuevo usuario (lector)."""
     conn = None
     try:
-        conn = sqlite3.connect(DB_FILE)
+        # Usa la ruta dinámica para la conexión
+        conn = sqlite3.connect(DATABASE_PATH)
         cursor = conn.cursor()
         cursor.execute(
             "INSERT INTO usuarios (nombre, dni, telefono) VALUES (?, ?, ?)",
@@ -339,7 +355,8 @@ def actualizar_usuario(user_id, nombre, telefono):
     """Actualiza la información de un usuario existente."""
     conn = None
     try:
-        conn = sqlite3.connect(DB_FILE)
+        # Usa la ruta dinámica para la conexión
+        conn = sqlite3.connect(DATABASE_PATH)
         cursor = conn.cursor()
         cursor.execute(
             "UPDATE usuarios SET nombre = ?, telefono = ? WHERE id = ?",
@@ -358,7 +375,8 @@ def eliminar_usuario(user_id):
     """Elimina un usuario. Solo si no tiene libros prestados activamente."""
     conn = None
     try:
-        conn = sqlite3.connect(DB_FILE)
+        # Usa la ruta dinámica para la conexión
+        conn = sqlite3.connect(DATABASE_PATH)
         cursor = conn.cursor()
         
         # 1. Contar préstamos activos
@@ -387,7 +405,8 @@ def registrar_prestamo(usuario_id, libro_id):
     """Registra un nuevo préstamo y actualiza el estado del libro."""
     conn = None
     try:
-        conn = sqlite3.connect(DB_FILE)
+        # Usa la ruta dinámica para la conexión
+        conn = sqlite3.connect(DATABASE_PATH)
         cursor = conn.cursor()
         
         # 1. Registrar el préstamo
@@ -417,7 +436,8 @@ def registrar_devolucion(prestamo_id, libro_id):
     """Registra la devolución de un libro y actualiza su estado."""
     conn = None
     try:
-        conn = sqlite3.connect(DB_FILE)
+        # Usa la ruta dinámica para la conexión
+        conn = sqlite3.connect(DATABASE_PATH)
         cursor = conn.cursor()
 
         # 1. Registrar la fecha de devolución en la tabla de préstamos
@@ -447,7 +467,8 @@ def obtener_prestamos_activos():
     """Obtiene una lista de todos los préstamos que aún no tienen fecha_devolucion."""
     conn = None
     try:
-        conn = sqlite3.connect(DB_FILE)
+        # Usa la ruta dinámica para la conexión
+        conn = sqlite3.connect(DATABASE_PATH)
         cursor = conn.cursor()
         
         query = """
@@ -477,3 +498,7 @@ def obtener_prestamos_activos():
 # Llamamos a la función
 # if __name__ == "__main__":
 #     inicializar_db()
+
+# Es crucial llamar a inicializar_db() para que la base de datos se cree/abra correctamente
+# antes de que la aplicación intente usar cualquiera de las funciones.
+inicializar_db()
