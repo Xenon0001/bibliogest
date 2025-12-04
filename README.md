@@ -31,7 +31,7 @@ Este proyecto fue desarrollado con la asistencia de herramientas de IA modernas.
 **1. Clonar el repositorio:**
 
 ```bash
-git clone https://github.com/tu-usuario/bibliogest.git
+git clone https://github.com/Xenon0001/bibliogest.git
 cd bibliogest
 ```
 
