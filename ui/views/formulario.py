@@ -8,10 +8,10 @@ from db.database import autenticar_bibliotecario, registrar_bibliotecario, verif
 # Importamos el widget de mensaje
 from ui.widgets.error import CustomMessage
 
-# Importamos la validación de utilidades
-from utils.validation import is_valid_email # <-- NUEVA IMPORTACIÓN
+# Importamos la validación mejorada
+from utils.validators_enhanced import EnhancedValidators
 
-# Importamos la App principal (que aún vamos a crear en app.py)
+# Importamos la App
 # Necesitamos la clase para poder hacer la transición
 from ui.views.app import App 
 
@@ -25,6 +25,7 @@ class CargaBienvenidaFrame(ctk.CTkFrame):
         super().__init__(master, corner_radius=10)
         self.master = master
         self.username = username
+
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure((0, 1), weight=1)
 
@@ -71,7 +72,6 @@ class LoginFrame(ctk.CTkFrame):
         super().__init__(master, corner_radius=10)
         self.master = master
         
-        
         self.grid_columnconfigure(0, weight=1)
         
         # Título
@@ -104,20 +104,22 @@ class LoginFrame(ctk.CTkFrame):
             CustomMessage(self.master, "Error de Validación", "Por favor, rellena todos los campos.", is_error=True)
             return
         
-        # 2. Validación de formato de email (USANDO utils/validation.py)
-        if not is_valid_email(email):
+        # 2. Validación de formato de email (mejorada)
+        if not EnhancedValidators.is_valid_email(email):
             CustomMessage(self.master, "Error de Validación", "El formato del correo electrónico no es válido.", is_error=True)
             return
 
-        # 3. Autenticación en la DB
-        nombre_usuario = autenticar_bibliotecario(email, contrasena)
-
-        if nombre_usuario:
+        # 3. Autenticación en la DB (mejorada)
+        resultado = autenticar_bibliotecario(email, contrasena)
+        
+        if resultado and resultado[0]:
             # ÉXITO: Ocultamos el Login y mostramos la Carga/Bienvenida
+            nombre_usuario = resultado[0]
             self.master.mostrar_carga_bienvenida(nombre_usuario)
         else:
             # ERROR: Credenciales inválidas
-            CustomMessage(self.master, "Error de Autenticación", "Email o contraseña incorrectos.", is_error=True)
+            mensaje_error = resultado[1] if resultado and resultado[1] else "Email o contraseña incorrectos."
+            CustomMessage(self.master, "Error de Autenticación", mensaje_error, is_error=True)
 
 
 # ----------------------------------------------------------------------
@@ -135,7 +137,7 @@ class RegistroFrame(ctk.CTkFrame):
         # Título
         ctk.CTkLabel(
             self, 
-            text="Registro (Primer Bibliotecario)", 
+            text="Regístrate",
             font=ctk.CTkFont(size=24, weight="bold")
         ).grid(row=0, column=0, pady=20, padx=20, sticky="ew")
 
@@ -145,14 +147,14 @@ class RegistroFrame(ctk.CTkFrame):
         self.nombre_entry.grid(row=2, column=0, padx=20, pady=(0, 10), sticky="ew")
 
         # Entry de Email
-        ctk.CTkLabel(self, text="Email (Será tu usuario):").grid(row=3, column=0, padx=20, pady=(10, 0), sticky="w")
+        ctk.CTkLabel(self, text="Email:").grid(row=3, column=0, padx=20, pady=(10, 0), sticky="w")
         self.email_entry = ctk.CTkEntry(self, placeholder_text="bibliotecario@ejemplo.com")
         self.email_entry.grid(row=4, column=0, padx=20, pady=(0, 10), sticky="ew")
 
-        # Entry de Contraseña
+        # Entry de Contraseña con indicador de requisitos
         ctk.CTkLabel(self, text="Contraseña:").grid(row=5, column=0, padx=20, pady=(10, 0), sticky="w")
         self.password_entry = ctk.CTkEntry(self, show="*", placeholder_text="Contraseña Segura")
-        self.password_entry.grid(row=6, column=0, padx=20, pady=(0, 20), sticky="ew")
+        self.password_entry.grid(row=6, column=0, padx=20, pady=(0, 10), sticky="ew")
 
         # Botón de Registro
         self.registro_button = ctk.CTkButton(self, text="Registrar y Continuar", command=self.validar_registro)
@@ -179,19 +181,22 @@ class RegistroFrame(ctk.CTkFrame):
             CustomMessage(self.master, "Error de Validación", "Debes rellenar todos los campos.", is_error=True)
             return
         
-        # 2. Validación de formato de email (USANDO utils/validation.py)
-        if not is_valid_email(email):
+        # 2. Validación de formato de email (mejorada)
+        if not EnhancedValidators.is_valid_email(email):
             CustomMessage(self.master, "Error de Validación", "El formato del correo electrónico no es válido.", is_error=True)
             return
         
-        # 3. Validación de contraseña mínima
-        if len(contrasena) < 6:
-             CustomMessage(self.master, "Error de Validación", "La contraseña debe tener al menos 6 caracteres.", is_error=True)
-             return
+        # 3. Validación de contraseña mejorada
+        from utils.security import PasswordSecurity
+        is_valid, msg = PasswordSecurity.validate_password_strength(contrasena)
+        if not is_valid:
+            CustomMessage(self.master, "Error de Validación", msg, is_error=True)
+            return
 
-        # 4. Registro en la DB
-        if registrar_bibliotecario(nombre, email, contrasena):
-            
+        # 4. Registro en la DB (mejorado)
+        resultado = registrar_bibliotecario(nombre, email, contrasena)
+        
+        if resultado and resultado[0]:
             # Definimos el callback para la transición, que solo se ejecuta al presionar Aceptar
             def on_registro_success():
                 # Esta función se ejecutará DESPUÉS de cerrar el CustomMessage
@@ -201,14 +206,15 @@ class RegistroFrame(ctk.CTkFrame):
             CustomMessage(
                 self.master, 
                 "Registro Exitoso", 
-                f"Bienvenido, {nombre}. Iniciando aplicación.", 
+                f"¡Bienvenido, {nombre}! Se han enviado notificaciones por correo.", 
                 is_error=False, 
                 callback=on_registro_success
             )
-            
         else:
-            # ERROR: Generalmente por email duplicado
-            CustomMessage(self.master, "Error de Registro", "El email ya está registrado o hubo un error interno.", is_error=True)
+            # ERROR: Mostrar mensaje específico del error
+            mensaje_error = resultado[1] if resultado and resultado[1] else "Error al registrar bibliotecario."
+            CustomMessage(self.master, "Error de Registro", mensaje_error, is_error=True)
+
 
 # ----------------------------------------------------------------------
 # CLASE MAINWINDOW (Contenedor de Vistas)
@@ -221,7 +227,7 @@ class FormularioMainWindow(ctk.CTk):
     def __init__(self, debe_registrar):
         super().__init__()
         self.title("Sistema de Gestión Bibliotecaria")
-        self.geometry("400x500")
+        self.geometry("500x470")
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
         

@@ -14,15 +14,17 @@ class TopFrame(ctk.CTkFrame):
         self.username = username
         self.change_view_callback = change_view_callback
         
-        # Grid Configuration: 3 Columnas (Usuario, Menú, Hora)
+        # Grid Configuration: 4 Columnas (Usuario, Menú, Hora, Logout)
         self.grid_columnconfigure(0, weight=1) # Usuario a la izquierda
         self.grid_columnconfigure(1, weight=3) # Menú central
-        self.grid_columnconfigure(2, weight=1) # Hora a la derecha
+        self.grid_columnconfigure(2, weight=1) # Hora
+        self.grid_columnconfigure(3, weight=1) # Logout a la derecha
         self.grid_rowconfigure(0, weight=1)
 
         self._create_user_label()
         self._create_navigation_menu()
         self._create_time_widget()
+        self._create_logout_button()
 
         # Inicia la actualización de la hora
         self.update_time()
@@ -56,10 +58,27 @@ class TopFrame(ctk.CTkFrame):
             )
             button.grid(row=0, column=i, padx=10, sticky="ew")
 
+    def _create_logout_button(self):
+        """Botón de cerrar sesión (Derecha)."""
+        logout_frame = ctk.CTkFrame(self, fg_color="transparent")
+        logout_frame.grid(row=0, column=3, padx=20, pady=10, sticky="e")
+        
+        self.logout_button = ctk.CTkButton(
+            logout_frame,
+            text="Cerrar Sesión",
+            command=self._logout,
+            corner_radius=8,
+            fg_color="#EF4444",
+            hover_color="#DC2626",
+            text_color="white",
+            width=120
+        )
+        self.logout_button.pack(side="right")
+
     def _create_time_widget(self):
-        """Widget de fecha y hora (Derecha)."""
+        """Widget de fecha y hora."""
         time_frame = ctk.CTkFrame(self, fg_color="transparent")
-        time_frame.grid(row=0, column=2, padx=20, pady=5, sticky="e")
+        time_frame.grid(row=0, column=2, padx=10, pady=5, sticky="e")
         
         # Fecha
         self.date_label = ctk.CTkLabel(
@@ -76,6 +95,36 @@ class TopFrame(ctk.CTkFrame):
             font=ctk.CTkFont(size=20, weight="bold")
         )
         self.time_label.pack(side="top", anchor="e")
+
+    def _logout(self):
+        """Maneja el cierre de sesión."""
+        from utils.security import log_security_event
+        
+        # Registrar evento de seguridad
+        log_security_event('logout', f'Cierre de sesión: {self.username}', self.username)
+        
+        # Confirmar cierre de sesión
+        from ui.widgets.error import CustomMessage
+        
+        def confirm_logout():
+            # Destruir la ventana actual
+            self.master.destroy()
+            
+            # Reabrir el formulario de login
+            from ui.views.formulario import iniciar_formulario
+            from db.database import verificar_existencia_bibliotecarios
+            
+            # Verificar si hay bibliotecarios registrados
+            hay_bibliotecario = verificar_existencia_bibliotecarios()
+            iniciar_formulario(debe_registrar=not hay_bibliotecario)
+        
+        CustomMessage(
+            self.master,
+            "Cerrar Sesión",
+            f"¿Estás seguro de que deseas cerrar la sesión de {self.username}?",
+            is_error=False,
+            callback=confirm_logout
+        )
 
     def update_time(self):
         """Actualiza la hora y fecha cada segundo."""

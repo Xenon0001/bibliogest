@@ -9,6 +9,7 @@ class CustomMessage(ctk.CTkToplevel):
     def __init__(self, master, title, message, is_error=False, callback=None):
         super().__init__(master)
         self.title(title)
+        self.geometry("400x200")
         self.message = message
         self.is_error = is_error
         self.callback = callback
@@ -25,11 +26,11 @@ class CustomMessage(ctk.CTkToplevel):
         
         # Color y texto del encabezado basado en el tipo de mensaje
         color = "#EF4444" if is_error else "#10B981"
-        icon = "❗ ERROR" if is_error else "✅ ÉXITO"
+        icon = "❗" if is_error else "✅"
         
         # Frame principal para contener todo
         main_frame = ctk.CTkFrame(self, fg_color=self.cget("fg_color"))
-        main_frame.pack(padx=20, pady=20, fill="both", expand=True)
+        main_frame.pack(padx=10, pady=20, fill="both", expand=True)
         main_frame.grid_columnconfigure(0, weight=1)
         
         # Título
@@ -54,7 +55,7 @@ class CustomMessage(ctk.CTkToplevel):
             text="Aceptar",
             command=self._confirm,
             fg_color=color
-        ).grid(row=2, column=0, padx=20, pady=(0, 10), sticky="ew")
+        ).grid(row=2, column=0, padx=20, pady=10, sticky="ew")
         
         # Centrar la ventana
         self.update_idletasks()

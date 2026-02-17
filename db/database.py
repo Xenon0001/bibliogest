@@ -3,16 +3,14 @@
     Utiliza el patrón de funciones para el acceso a datos.
 """
 import sqlite3
-import hashlib
 import datetime
+import logging
 # Importamos la ruta dinámica que resuelve PyInstaller o entorno de desarrollo
 from utils.path_utils import DATABASE_PATH 
+from utils.security import PasswordSecurity, log_security_event
+from utils.validators_enhanced import EnhancedValidators 
 
 # La variable DB_FILE ya no es necesaria, usamos DATABASE_PATH
-
-def obtener_hash(contrasena):
-    """Genera el hash MD5 de una contraseña."""
-    return hashlib.md5(contrasena.encode('utf-8')).hexdigest()
 
 def inicializar_db():
     """Crea la base de datos y las tablas si no existen."""
@@ -46,7 +44,9 @@ def inicializar_db():
             titulo TEXT NOT NULL,
             autor TEXT NOT NULL,
             isbn TEXT UNIQUE,
-            categoria TEXT, 
+            categoria TEXT,
+            editorial TEXT,
+            fecha_publicacion DATE,
             disponible INTEGER DEFAULT 1 -- 1: Disponible, 0: Prestado
         );
         -- 4. Tabla de PRESTAMOS (Relaciona usuarios y libros)
@@ -91,52 +91,77 @@ def verificar_existencia_bibliotecarios():
             conn.close()
 
 def registrar_bibliotecario(nombre, email, contrasena):
-    """Registra un nuevo bibliotecario y devuelve True si tiene éxito."""
+    """Registra un nuevo bibliotecario con seguridad mejorada."""
     conn = None
     try:
-        # Usa la ruta dinámica para la conexión
+        # Validar email y contraseña
+        if not EnhancedValidators.is_valid_email(email):
+            log_security_event('registro_fallo', f'Email inválido: {email}', email)
+            return False, "Email inválido"
+        
+        is_valid, msg = PasswordSecurity.validate_password_strength(contrasena)
+        if not is_valid:
+            log_security_event('registro_fallo', f'Contraseña débil: {msg}', email)
+            return False, msg
+        
+        # Generar hash seguro
+        password_hash = PasswordSecurity.hash_password(contrasena)
+        
         conn = sqlite3.connect(DATABASE_PATH)
         cursor = conn.cursor()
-        password_hash = obtener_hash(contrasena)
         
         cursor.execute(
             "INSERT INTO bibliotecarios (nombre, email, password_hash) VALUES (?, ?, ?)",
             (nombre, email, password_hash)
         )
         conn.commit()
-        return True
+        
+        log_security_event('registro', f'Bibliotecario registrado: {nombre}', email)
+        return True, "Registro exitoso"
+        
     except sqlite3.IntegrityError:
-        return False
+        log_security_event('registro_fallo', f'Email duplicado: {email}', email)
+        return False, "El email ya está registrado"
     except Exception as e:
-        print(f"Error al registrar bibliotecario: {e}")
-        return False
+        log_security_event('error', f'Error registrando bibliotecario: {str(e)}', email)
+        return False, f"Error al registrar: {str(e)}"
     finally:
         if conn:
             conn.close()
 
 def autenticar_bibliotecario(email, contrasena):
-    """Autentica un bibliotecario y devuelve su nombre si tiene éxito."""
+    """Autentica un bibliotecario con seguridad mejorada."""
     conn = None
     try:
-        # Usa la ruta dinámica para la conexión
+        # Validar email primero
+        if not EnhancedValidators.is_valid_email(email):
+            log_security_event('login_fallo', f'Email inválido: {email}', email)
+            return None, "Email inválido"
+        
         conn = sqlite3.connect(DATABASE_PATH)
         cursor = conn.cursor()
-        password_hash = obtener_hash(contrasena)
-
-        cursor.execute(
-            "SELECT nombre FROM bibliotecarios WHERE email = ? AND password_hash = ?",
-            (email, password_hash)
-        )
+        
+        # Obtener hash almacenado
+        cursor.execute("SELECT nombre, password_hash FROM bibliotecarios WHERE email = ?", (email,))
         resultado = cursor.fetchone()
         
-        if resultado:
-            return resultado[0] # Retorna el nombre del bibliotecario
+        if not resultado:
+            log_security_event('login_fallo', f'Email no encontrado: {email}', email)
+            return None, "Credenciales incorrectas"
+        
+        nombre, stored_hash = resultado
+        
+        # Verificar contraseña
+        if PasswordSecurity.verify_password(contrasena, stored_hash):
+            log_security_event('login', f'Login exitoso: {nombre}', email)
+            return nombre, "Autenticación exitosa"
         else:
-            return None # Credenciales inválidas
+            log_security_event('login_fallo', f'Contraseña incorrecta: {email}', email)
+            return None, "Credenciales incorrectas"
             
     except Exception as e:
-        print(f"Error al autenticar bibliotecario: {e}")
-        return None
+        log_security_event('error', f'Error autenticando bibliotecario: {str(e)}', email)
+        return None, f"Error de autenticación: {str(e)}"
     finally:
         if conn:
             conn.close()
@@ -149,13 +174,16 @@ def obtener_todos_los_libros():
     """Obtiene todos los libros con el estado de disponibilidad."""
     conn = None
     try:
-        # Usa la ruta dinámica para la conexión
         conn = sqlite3.connect(DATABASE_PATH)
         cursor = conn.cursor()
-        cursor.execute("SELECT isbn, titulo, autor, categoria, disponible, id FROM libros")
+        cursor.execute("""
+            SELECT isbn, titulo, autor, categoria, editorial, fecha_publicacion, disponible, id 
+            FROM libros 
+            ORDER BY titulo
+        """)
         return cursor.fetchall()
     except Exception as e:
-        print(f"Error al obtener libros: {e}")
+        log_security_event('error', f'Error obteniendo libros: {str(e)}')
         return []
     finally:
         if conn:
@@ -165,7 +193,6 @@ def obtener_libro_por_isbn(isbn):
     """Obtiene un libro por su ISBN."""
     conn = None
     try:
-        # Usa la ruta dinámica para la conexión
         conn = sqlite3.connect(DATABASE_PATH)
         cursor = conn.cursor()
         cursor.execute("SELECT id, isbn, titulo, disponible FROM libros WHERE isbn = ?", (isbn,))
@@ -181,7 +208,6 @@ def obtener_libros_prestados_count():
     """Obtiene el número de libros actualmente prestados (disponible = 0)."""
     conn = None
     try:
-        # Usa la ruta dinámica para la conexión
         conn = sqlite3.connect(DATABASE_PATH)
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) FROM libros WHERE disponible = 0")
@@ -193,46 +219,81 @@ def obtener_libros_prestados_count():
         if conn:
             conn.close()
 
-def insertar_libro(titulo, autor, isbn, categoria):
-    """Inserta un nuevo libro en la base de datos."""
+def insertar_libro(titulo, autor, isbn, categoria, editorial=None, fecha_publicacion=None):
+    """Inserta un nuevo libro en la base de datos con validación mejorada."""
     conn = None
     try:
-        # Usa la ruta dinámica para la conexión
+        # Validar ISBN si se proporciona
+        if isbn:
+            is_valid, msg = EnhancedValidators.is_valid_isbn(isbn)
+            if not is_valid:
+                log_security_event('error', f'ISBN inválido: {isbn} - {msg}')
+                return False, f"ISBN inválido: {msg}"
+        
+        # Validar fecha de publicación si se proporciona
+        if fecha_publicacion:
+            is_valid, msg = EnhancedValidators.is_valid_date(fecha_publicacion)
+            if not is_valid:
+                log_security_event('error', f'Fecha inválida: {fecha_publicacion} - {msg}')
+                return False, f"Fecha de publicación inválida: {msg}"
+        
         conn = sqlite3.connect(DATABASE_PATH)
         cursor = conn.cursor()
-        cursor.execute(
-            "INSERT INTO libros (titulo, autor, isbn, categoria) VALUES (?, ?, ?, ?)",
-            (titulo, autor, isbn, categoria)
-        )
+        cursor.execute("""
+            INSERT INTO libros (titulo, autor, isbn, categoria, editorial, fecha_publicacion) 
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (titulo, autor, isbn, categoria, editorial, fecha_publicacion))
+        
         conn.commit()
-        return True
-    except sqlite3.IntegrityError:
-        return False
+        log_security_event('info', f'Libro insertado: {titulo} - {autor}')
+        return True, "Libro agregado exitosamente"
+        
+    except sqlite3.IntegrityError as e:
+        log_security_event('error', f'ISBN duplicado: {isbn}')
+        return False, "El ISBN ya está registrado"
     except Exception as e:
-        print(f"Error al insertar libro: {e}")
-        return False
+        log_security_event('error', f'Error insertando libro: {str(e)}')
+        return False, f"Error al insertar libro: {str(e)}"
     finally:
         if conn:
             conn.close()
 
-def actualizar_libro(libro_id, titulo, autor, isbn, categoria):
+def actualizar_libro(libro_id, titulo, autor, isbn, categoria, editorial=None, fecha_publicacion=None):
     """Actualiza la información de un libro existente."""
     conn = None
     try:
-        # Usa la ruta dinámica para la conexión
+        # Validar ISBN si se proporciona
+        if isbn:
+            is_valid, msg = EnhancedValidators.is_valid_isbn(isbn)
+            if not is_valid:
+                log_security_event('error', f'ISBN inválido: {isbn} - {msg}')
+                return False, f"ISBN inválido: {msg}"
+        
+        # Validar fecha de publicación si se proporciona
+        if fecha_publicacion:
+            is_valid, msg = EnhancedValidators.is_valid_date(fecha_publicacion)
+            if not is_valid:
+                log_security_event('error', f'Fecha inválida: {fecha_publicacion} - {msg}')
+                return False, f"Fecha de publicación inválida: {msg}"
+        
         conn = sqlite3.connect(DATABASE_PATH)
         cursor = conn.cursor()
-        cursor.execute(
-            "UPDATE libros SET titulo = ?, autor = ?, isbn = ?, categoria = ? WHERE id = ?",
-            (titulo, autor, isbn, categoria, libro_id)
-        )
+        cursor.execute("""
+            UPDATE libros 
+            SET titulo = ?, autor = ?, isbn = ?, categoria = ?, editorial = ?, fecha_publicacion = ? 
+            WHERE id = ?
+        """, (titulo, autor, isbn, categoria, editorial, fecha_publicacion, libro_id))
+        
         conn.commit()
-        return True
-    except sqlite3.IntegrityError:
-        return False
+        log_security_event('info', f'Libro actualizado ID {libro_id}: {titulo}')
+        return True, "Libro actualizado exitosamente"
+        
+    except sqlite3.IntegrityError as e:
+        log_security_event('error', f'ISBN duplicado al actualizar: {isbn}')
+        return False, "El ISBN ya está registrado en otro libro"
     except Exception as e:
-        print(f"Error al actualizar libro ID {libro_id}: {e}")
-        return False
+        log_security_event('error', f'Error actualizando libro ID {libro_id}: {str(e)}')
+        return False, f"Error al actualizar libro: {str(e)}"
     finally:
         if conn:
             conn.close()
@@ -495,10 +556,5 @@ def obtener_prestamos_activos():
         if conn:
             conn.close()
     
-# Llamamos a la función
-# if __name__ == "__main__":
-#     inicializar_db()
-
-# Es crucial llamar a inicializar_db() para que la base de datos se cree/abra correctamente
-# antes de que la aplicación intente usar cualquiera de las funciones.
-inicializar_db()
+# NOTA: La inicialización de la base de datos ahora se maneja explícitamente en main.py
+# para evitar inicializaciones automáticas al importar el módulo.

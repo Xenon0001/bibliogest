@@ -9,20 +9,24 @@ class FormBiblioteca(ctk.CTkToplevel):
     def __init__(self, master, refresh_callback, book_data=None):
         super().__init__(master)
         self.title("Gestión de Libro")
-        self.geometry("450x550")
+        self.geometry("460x450")
         
         # Configuración modal
         self.transient(master) 
-        self.grab_set() 
+        self.grab_set()
         
         self.refresh_callback = refresh_callback
         self.book_data = book_data 
-        self.book_id = book_data[0] if book_data else None
-        self.is_available = book_data[5] if book_data and len(book_data) > 5 else 1 
+        
+        # CORRECCIÓN: Los índices correctos según database.py línea 184-188
+        # SELECT isbn, titulo, autor, categoria, editorial, fecha_publicacion, disponible, id
+        # [0]=isbn, [1]=titulo, [2]=autor, [3]=categoria, [4]=editorial, [5]=fecha_publicacion, [6]=disponible, [7]=id
+        self.book_id = book_data[7] if book_data else None  # id está en [7]
+        self.is_available = book_data[6] if book_data else 1  # disponible está en [6]
         
         self.grid_columnconfigure(0, weight=0)
         self.grid_columnconfigure(1, weight=1)
-        self.grid_rowconfigure(6, weight=1) 
+        self.grid_rowconfigure(8, weight=1)
         
         self._create_header()
         self._create_form_fields()
@@ -56,8 +60,8 @@ class FormBiblioteca(ctk.CTkToplevel):
     def _safe_focus(self):
         """Establece el foco solo si el widget y la ventana existen."""
         try:
-            if self.winfo_exists() and "Título" in self.fields:
-                self.fields["Título"].focus_set()
+            if self.winfo_exists() and "titulo" in self.fields:
+                self.fields["titulo"].focus_set()
         except Exception:
             pass
 
@@ -78,29 +82,42 @@ class FormBiblioteca(ctk.CTkToplevel):
         self._clean_close()
 
     def _create_header(self):
-        title_text = "Editar/Eliminar Libro" if self.book_data else "Agregar Nuevo Libro"
+        title_text = "Editar | Eliminar" if self.book_data else "Agregar Nuevo Libro"
         ctk.CTkLabel(
             self,
             text=title_text,
             font=ctk.CTkFont(size=20, weight="bold")
-        ).grid(row=0, column=0, columnspan=2, padx=20, pady=(20, 10), sticky="ew")
+        ).grid(row=0, column=0, columnspan=2, padx=20, pady=20, sticky="ew")
 
     def _create_form_fields(self):
         self.fields = {}
-        labels = ["Título:", "Autor:", "ISBN:", "Categoría:"]
+        field_configs = [
+            ("Título:", "titulo"),
+            ("Autor:", "autor"), 
+            ("ISBN:", "isbn"),
+            ("Categoría:", "categoria"),
+            ("Editorial:", "editorial"),
+            ("Fecha Publicación:", "fecha_publicacion")
+        ]
         
-        for i, label_text in enumerate(labels):
+        for i, (label_text, field_key) in enumerate(field_configs):
             ctk.CTkLabel(self, text=label_text).grid(row=i+1, column=0, padx=(20, 10), pady=(10, 0), sticky="w")
-            entry = ctk.CTkEntry(self)
+            
+            # Configuración especial para fecha de publicación
+            if label_text == "Fecha Publicación:":
+                entry = ctk.CTkEntry(self, placeholder_text="YYYY-MM-DD")
+            else:
+                entry = ctk.CTkEntry(self)
+                
             entry.grid(row=i+1, column=1, padx=(0, 20), pady=(0, 10), sticky="ew")
-            self.fields[label_text.split(':')[0]] = entry
+            self.fields[field_key] = entry
             
             if self.book_data and label_text == "ISBN:":
                 entry.configure(state="disabled")
 
     def _create_action_buttons(self):
         button_frame = ctk.CTkFrame(self, fg_color="transparent")
-        button_frame.grid(row=5, column=0, columnspan=2, padx=20, pady=(10, 20), sticky="ew")
+        button_frame.grid(row=7, column=0, columnspan=2, padx=20, pady=(10, 20), sticky="ew")
         button_frame.grid_columnconfigure((0, 1, 2), weight=1)
 
         action_text = "Guardar Cambios" if self.book_data else "Agregar Libro"
@@ -137,45 +154,51 @@ class FormBiblioteca(ctk.CTkToplevel):
 
     def _load_data(self):
         if self.book_data:
-            data = {
-                "Título": self.book_data[1],
-                "Autor": self.book_data[2],
-                "ISBN": self.book_data[3],
-                "Categoría": self.book_data[4]
-            }
-            self.fields["Título"].insert(0, data["Título"])
-            self.fields["Autor"].insert(0, data["Autor"])
-            self.fields["ISBN"].configure(state="normal")
-            self.fields["ISBN"].insert(0, data["ISBN"])
-            self.fields["ISBN"].configure(state="disabled")
-            self.fields["Categoría"].insert(0, data["Categoría"])
+            # CORRECCIÓN: Usar los índices correctos según database.py
+            # book_data = [isbn, titulo, autor, categoria, editorial, fecha_publicacion, disponible, id]
+            self.fields["titulo"].insert(0, self.book_data[1])       # titulo está en [1]
+            self.fields["autor"].insert(0, self.book_data[2])        # autor está en [2]
+
+            self.fields["isbn"].configure(state="normal")
+            self.fields["isbn"].insert(0, self.book_data[0])         # isbn está en [0]
+            self.fields["isbn"].configure(state="disabled")
+            
+            self.fields["categoria"].insert(0, self.book_data[3])    # categoria está en [3]
+            self.fields["editorial"].insert(0, self.book_data[4])    # editorial está en [4]
+            self.fields["fecha_publicacion"].insert(0, self.book_data[5])  # fecha_publicacion está en [5]
 
     def _save_action(self):
-        titulo = self.fields["Título"].get().strip()
-        autor = self.fields["Autor"].get().strip()
-        categoria = self.fields["Categoría"].get().strip()
-        isbn = self.book_data[3] if self.book_data else self.fields["ISBN"].get().strip()
+        titulo = self.fields["titulo"].get().strip()
+        autor = self.fields["autor"].get().strip()
+        isbn = self.fields["isbn"].get().strip()
+        categoria = self.fields["categoria"].get().strip()
+        editorial = self.fields["editorial"].get().strip()
+        fecha_publicacion = self.fields["fecha_publicacion"].get().strip()
 
         if not all([titulo, autor, isbn, categoria]):
-            CustomMessage(self.master, "Error de Validación", "Todos los campos deben estar rellenos.", is_error=True)
+            CustomMessage(self.master, "Error de Validación", "Los campos Título, Autor, ISBN y Categoría son obligatorios.", is_error=True)
             return
 
         success = False
         message = ""
         
         if self.book_data:
-            if actualizar_libro(self.book_id, titulo, autor, isbn, categoria):
+            resultado = actualizar_libro(self.book_id, titulo, autor, isbn, categoria, editorial, fecha_publicacion)
+            if resultado and resultado[0]:
                 success = True
-                message = "Libro actualizado correctamente."
+                message = resultado[1]
             else:
-                CustomMessage(self.master, "Error", "No se pudo actualizar el libro.", is_error=True)
+                mensaje_error = resultado[1] if resultado and resultado[1] else "No se pudo actualizar el libro."
+                CustomMessage(self.master, "Error", mensaje_error, is_error=True)
                 return
         else:
-            if insertar_libro(titulo, autor, isbn, categoria):
+            resultado = insertar_libro(titulo, autor, isbn, categoria, editorial, fecha_publicacion)
+            if resultado and resultado[0]:
                 success = True
-                message = "Libro agregado correctamente."
+                message = resultado[1]
             else:
-                CustomMessage(self.master, "Error", "No se pudo agregar (ISBN duplicado).", is_error=True)
+                mensaje_error = resultado[1] if resultado and resultado[1] else "No se pudo agregar el libro."
+                CustomMessage(self.master, "Error", mensaje_error, is_error=True)
                 return
         
         if success:

@@ -79,7 +79,7 @@ class FormUsuario(ctk.CTkToplevel):
         self._clean_close()
         
     def _create_header(self):
-        title_text = "Editar/Eliminar Usuario" if self.user_data else "Agregar Nuevo Usuario"
+        title_text = "Editar | Eliminar" if self.user_data else "Agregar Nuevo Usuario"
         ctk.CTkLabel(
             self,
             text=title_text,

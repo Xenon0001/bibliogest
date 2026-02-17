@@ -13,7 +13,7 @@ DATABASE_PATH = os.path.join(BASE_DIR, 'biblioteca.db')
 APP_TITLE = "Sistema de Gestión Bibliotecaria"
 APP_VERSION = "1.0.0"
 
-# --- Configuración de UI (Opcional, pero útil) ---
+# --- Configuración de UI ---
 DEFAULT_THEME = "dark" # "light" o "dark"
 DEFAULT_COLOR_THEME = "blue" # Colores de CTK
 

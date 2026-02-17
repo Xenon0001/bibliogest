@@ -2,7 +2,7 @@
 venv/
 env/
 ENV/
-.venv
+.venv/
 
 # Archivos compilados
 __pycache__/
@@ -55,6 +55,20 @@ Thumbs.db
 # Logging
 *.log
 logs/
+biblioteca_*.log
+
+# Build y distribución específicos
+BiblioGest_v*_Portable/
+*.spec
+!scripts/build.py
+
+# Archivos de configuración sensibles
+.env
+.env.local
+.env.*.local
+
+# Archivos temporales de desarrollo
+NOTE.md
 
 # Tests
 .pytest_cache/

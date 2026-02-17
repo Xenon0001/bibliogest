@@ -95,7 +95,7 @@ class BibliotecaView(ctk.CTkFrame):
         table_frame.grid_rowconfigure(0, weight=1)
         
         # 1. Definición de la tabla
-        columns = ("ISBN", "Título", "Autor", "Categoría", "Disponible")
+        columns = ("ISBN", "Título", "Autor", "Categoría", "Editorial", "Fecha Pub.", "Disponible")
         self.tree = ttk.Treeview(table_frame, columns=columns, show="headings")
         
         # 2. Encabezados de la tabla
@@ -103,14 +103,18 @@ class BibliotecaView(ctk.CTkFrame):
         self.tree.heading("Título", text="Título", anchor="w")
         self.tree.heading("Autor", text="Autor", anchor="w")
         self.tree.heading("Categoría", text="Categoría", anchor="center")
+        self.tree.heading("Editorial", text="Editorial", anchor="center")
+        self.tree.heading("Fecha Pub.", text="Fecha Pub.", anchor="center")
         self.tree.heading("Disponible", text="Disponible", anchor="center")
         
         # 3. Ancho de columnas
-        self.tree.column("ISBN", width=120, anchor="center")
-        self.tree.column("Título", width=300, anchor="w")
-        self.tree.column("Autor", width=250, anchor="w")
-        self.tree.column("Categoría", width=100, anchor="center")
-        self.tree.column("Disponible", width=80, anchor="center")
+        self.tree.column("ISBN", width=100, anchor="center")
+        self.tree.column("Título", width=250, anchor="w")
+        self.tree.column("Autor", width=200, anchor="w")
+        self.tree.column("Categoría", width=80, anchor="center")
+        self.tree.column("Editorial", width=120, anchor="center")
+        self.tree.column("Fecha Pub.", width=90, anchor="center")
+        self.tree.column("Disponible", width=70, anchor="center")
 
         # 4. Scrollbar
         scrollbar = ctk.CTkScrollbar(table_frame, command=self.tree.yview)
@@ -134,12 +138,12 @@ class BibliotecaView(ctk.CTkFrame):
         self.libros_data = obtener_todos_los_libros()
         
         for row in self.libros_data:
-            # row: (isbn, titulo, autor, categoria, disponible, id)
-            status = "Sí" if row[4] == 1 else "No"
-            # Insertar los datos visibles (ISBN, Título, Autor, Categoría, Disponible)
+            # row: (isbn, titulo, autor, categoria, editorial, fecha_publicacion, disponible, id)
+            status = "Sí" if row[6] == 1 else "No"
+            # Insertar los datos visibles
             self.tree.insert('', 'end', 
-                             values=(row[0], row[1], row[2], row[3], status),
-                             tags=("disponible" if row[4] == 1 else "prestado",))
+                             values=(row[0], row[1], row[2], row[3], row[4] or "", row[5] or "", status),
+                             tags=("disponible" if row[6] == 1 else "prestado",))
 
         # Actualizar contador de prestados
         count = obtener_libros_prestados_count()
@@ -169,11 +173,11 @@ class BibliotecaView(ctk.CTkFrame):
             ]
 
         for row in data_to_show:
-            # row: (isbn, titulo, autor, categoria, disponible, id)
-            status = "Sí" if row[4] == 1 else "No"
+            # row: (isbn, titulo, autor, categoria, editorial, fecha_publicacion, disponible, id)
+            status = "Sí" if row[6] == 1 else "No"
             self.tree.insert('', 'end', 
-                             values=(row[0], row[1], row[2], row[3], status),
-                             tags=("disponible" if row[4] == 1 else "prestado",))
+                             values=(row[0], row[1], row[2], row[3], row[4] or "", row[5] or "", status),
+                             tags=("disponible" if row[6] == 1 else "prestado",))
 
 
     def on_double_click(self, event):
